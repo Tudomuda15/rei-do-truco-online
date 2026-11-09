@@ -6,13 +6,14 @@
 <section class="panel" id="lobby">
 <label>Seu apelido<input id="name" maxlength="18" value="Jogador"></label>
 <label>Modo de truco<select id="mode"><option value="paulista">Truco Paulista</option><option value="mineiro">Truco Mineiro</option></select></label>
-<div class="buttons"><button id="create">Criar sala</button></div>
+<div class="buttons"><button id="solo" type="button">Jogar sozinho</button><button id="create">Criar sala</button></div>
 <label>Código da sala<input id="code" placeholder="Ex.: A1B2C3" maxlength="6"></label><button id="join" class="secondary">Entrar em sala</button>
-<p id="status" class="status">Crie uma sala ou entre com um código.</p></section>
+<p id="status" class="status">Jogue com três bots, crie uma sala ou entre com um código.</p></section>
 <section class="panel game" id="game" hidden>
-<div class="roomline"><strong>Sala <span id="roomcode"></span></strong><span id="modeLabel"></span></div>
+<div class="roomline"><strong><span id="room-prefix">Sala </span><span id="roomcode"></span></strong><span id="modeLabel"></span></div>
 <div class="players" id="players"></div><div class="score" id="score"></div>
 <div class="table"><p id="message">Esperando partida...</p><div id="played"></div></div>
+<p id="turn-status" class="status" aria-live="polite" hidden></p>
 <button id="start">Iniciar partida (4 jogadores)</button><div class="hand" id="hand"></div>
 <button id="leave" class="secondary">Sair da sala</button>
 </section><footer>MVP de demonstração • fichas virtuais • sem apostas em dinheiro real</footer>
