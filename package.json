@@ -1,0 +1,8 @@
+{
+  "name": "rei-do-truco-online",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MVP multiplayer browser truco (Paulista and Mineiro) with rooms and virtual points",
+  "scripts": {"start":"node server.js","dev":"node server.js"},
+  "dependencies": {"express":"^4.21.2","socket.io":"^4.8.1"}
+}
