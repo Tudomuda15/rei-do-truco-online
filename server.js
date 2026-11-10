@@ -18,21 +18,21 @@ const tableById = new Map(tables.map(table => [table.id, table]));
 const SUITS = ["♦","♠","♥","♣"];
 const RANKS = ["4","5","6","7","Q","J","K","A","2","3"];
 const VALUE = Object.fromEntries(RANKS.map((r,i)=>[r,i]));
-function deck(mode) {
-  let d = [];
-  for (const s of SUITS) for (const r of RANKS) d.push({r,s,id:r+s});
-  if (mode === "mineiro") {
-    // Fixed manilhas: 4♣, 7♥, A♠, 7♦ in descending order.
-    const fixed = ["4♣","7♥","A♠","7♦"];
-    d.sort((a,b)=> (fixed.includes(b.id)?100+fixed.indexOf(b.id):VALUE[b.r]) -
-                   (fixed.includes(a.id)?100+fixed.indexOf(a.id):VALUE[a.r]));
-  }
-  return d;
+const MINEIRO_MANILHAS = ["7♦", "A♠", "7♥", "4♣"];
+function deck() {
+  return SUITS.flatMap(s => RANKS.map(r => ({ r, s, id: r + s })));
+}
+function cardStrength(room, card) {
+  const manilha = room.mode === "mineiro"
+    ? MINEIRO_MANILHAS.indexOf(card.id)
+    : card.r === room.manilhaRank ? SUITS.indexOf(card.s) : -1;
+  return manilha >= 0 ? RANKS.length + manilha : VALUE[card.r];
 }
 function shuffled(a) { for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
 function roomView(room, socketId) {
   return {code:room.code, mode:room.mode, solo:room.solo, players:room.players.map(p=>({name:p.name, seat:p.seat, team:p.seat%2, ready:!!p.ready, you:p.id===socketId})),
     size:room.size, match:room.match,
+    vira:room.vira, manilhaRank:room.manilhaRank,
     started:room.started, round:room.round, points:room.points, turn:room.turn,
     table:room.table.map(t=>({seat:t.seat, card:t.card})), message:room.message};
 }
@@ -54,7 +54,8 @@ function createRoom(mode, { solo = false, size = 4, match = null } = {}) {
     code = crypto.randomBytes(3).toString("hex").toUpperCase();
   } while (rooms.has(code));
   const room = { code, mode, solo, size, match, players: [], started: false,
-    round: 1, points: [0, 0], turn: 0, table: [], message: "Aguardando 4 jogadores." };
+    round: 1, points: [0, 0], turn: 0, table: [], vira: null, manilhaRank: null,
+    message: "Aguardando 4 jogadores." };
   rooms.set(code, room);
   return room;
 }
@@ -104,7 +105,9 @@ function startGame(room) {
   room.points = [0, 0];
   room.turn = 0;
   room.table = [];
-  const cards = shuffled(deck(room.mode));
+  const cards = shuffled(deck());
+  room.vira = room.mode === "paulista" ? cards[room.players.length * 3] : null;
+  room.manilhaRank = room.vira ? RANKS[(VALUE[room.vira.r] + 1) % RANKS.length] : null;
   room.players.forEach((player, index) => {
     player.hand = cards.slice(index * 3, index * 3 + 3);
     sendHand(player);
@@ -113,9 +116,9 @@ function startGame(room) {
   broadcast(room);
 }
 
-function trickWinner(table) {
-  // Preserve the prototype's simplified ranking in both room types.
-  return table.reduce((best, entry) => VALUE[entry.card.r] > VALUE[best.card.r] ? entry : best);
+function trickWinner(room) {
+  return room.table.reduce((best, entry) =>
+    cardStrength(room, entry.card) > cardStrength(room, best.card) ? entry : best);
 }
 
 function scheduleBotTurn(room) {
@@ -125,10 +128,10 @@ function scheduleBotTurn(room) {
 
   room.botTimer = setTimeout(() => {
     room.botTimer = undefined;
-    const ordered = [...bot.hand].sort((a, b) => VALUE[a.r] - VALUE[b.r]);
-    const leading = room.table.length ? trickWinner(room.table) : null;
+    const ordered = [...bot.hand].sort((a, b) => cardStrength(room, a) - cardStrength(room, b));
+    const leading = room.table.length ? trickWinner(room) : null;
     const winningCard = leading && leading.seat % 2 !== bot.seat % 2
-      ? ordered.find(card => VALUE[card.r] > VALUE[leading.card.r])
+      ? ordered.find(card => cardStrength(room, card) > cardStrength(room, leading.card))
       : null;
     playCard(room, bot, winningCard || ordered[0]);
   }, 650);
@@ -142,7 +145,7 @@ function playCard(room, player, card) {
   sendHand(player);
 
   if (room.table.length === room.size) {
-    const winner = trickWinner(room.table);
+    const winner = trickWinner(room);
     const winnerName = room.size === 2 ? room.players.find(candidate => candidate.seat === winner.seat).name
       : `Dupla ${winner.seat % 2 + 1}`;
     room.points[winner.seat % 2] += 1;

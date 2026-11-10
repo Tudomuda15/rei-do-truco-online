@@ -113,7 +113,20 @@
       <div class="arena">
         <div class="table" aria-label="Mesa de jogo">
           <span class="felt-mark" aria-hidden="true">♛</span>
-          <div id="played" class="played"></div>
+          <div class="table-cards">
+            <div class="table-stock">
+              <div class="stock-item">
+                <span class="card deck-back" aria-hidden="true">♛</span>
+                <span>Baralho</span>
+              </div>
+              <div class="stock-item" id="vira-slot" hidden>
+                <span id="vira-card"></span>
+                <span>Vira</span>
+              </div>
+              <span id="table-manilha" class="table-manilha" hidden></span>
+            </div>
+            <div id="played" class="played"></div>
+          </div>
         </div>
         <div id="players" class="players" aria-label="Jogadores"></div>
       </div>

@@ -180,6 +180,12 @@ socket.on("room:update", updatedRoom => {
   $("room-prefix").hidden = room.solo || Boolean(room.match);
   $("modeLabel").textContent = variantName[room.mode];
 
+  $("vira-slot").hidden = !room.vira;
+  $("vira-card").replaceChildren(...(room.vira ? [makeCard(room.vira)] : []));
+  const manilha = $("table-manilha");
+  manilha.hidden = !room.manilhaRank && room.mode !== "mineiro";
+  manilha.textContent = room.mode === "mineiro" ? "Manilhas fixas" : `Manilha ${room.manilhaRank ?? ""}`;
+
   renderPlayers(you);
   for (let team = 0; team < 2; team++) {
     $("team-" + team).textContent = room.size === 2

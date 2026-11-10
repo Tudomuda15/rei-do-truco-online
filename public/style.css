@@ -190,6 +190,31 @@ footer span { margin-inline: 4px; color: var(--gold); }
   opacity: .6;
 }
 .felt-mark { position: absolute; z-index: -1; color: #d7dfae35; font: clamp(70px, 14vw, 115px)/1 var(--display); }
+.table-cards {
+  display: grid;
+  justify-items: center;
+  gap: clamp(8px, 1.4vw, 15px);
+  width: min(100%, 470px);
+}
+.table-stock { display: flex; align-items: center; justify-content: center; gap: clamp(10px, 2.2vw, 22px); }
+.stock-item { display: grid; justify-items: center; gap: 3px; color: #fff9e9; font-size: .68rem; font-weight: 750; }
+.table-stock .card { width: clamp(31px, 5vw, 45px); }
+.table-stock .card.deck-back {
+  border-color: #e2c88e;
+  background: repeating-linear-gradient(135deg, #1b2b54 0 4px, #263b6a 4px 8px);
+  color: #f4d49b;
+  font-size: clamp(1.05rem, 3vw, 1.65rem);
+  box-shadow: 2px 2px #18233d, 3px 3px #b9a16e, 5px 5px #111b2b;
+}
+.table-manilha {
+  padding: 3px 7px;
+  border: 1px solid #ffffff4a;
+  border-radius: 999px;
+  background: #13382c;
+  color: #fff9e9;
+  font-size: .69rem;
+  font-weight: 750;
+}
 .players { position: absolute; inset: 0; pointer-events: none; }
 .player {
   position: absolute;
@@ -231,7 +256,7 @@ footer span { margin-inline: 4px; color: var(--gold); }
 .game-controls > button { margin-top: 3px; }
 
 .played, .hand { display: flex; justify-content: center; align-items: flex-start; gap: 6px; }
-.played { width: 100%; padding: 0 3px; }
+.played { width: 100%; min-height: calc(clamp(33px, 7vw, 65px) / .72 + 1.2rem); padding: 0 3px; }
 .played-card { display: grid; justify-items: center; min-width: 0; }
 .played-name {
   overflow: hidden;
