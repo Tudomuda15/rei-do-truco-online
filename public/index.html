@@ -1,20 +1,114 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rei do Truco Online</title><link rel="stylesheet" href="style.css"></head>
-<body><main class="shell">
-<header><div class="crown">👑</div><h1>REI DO TRUCO <span>ONLINE</span></h1><p>O seu lugar é na mesa!</p></header>
-<section class="panel" id="lobby">
-<label>Seu apelido<input id="name" maxlength="18" value="Jogador"></label>
-<label>Modo de truco<select id="mode"><option value="paulista">Truco Paulista</option><option value="mineiro">Truco Mineiro</option></select></label>
-<div class="buttons"><button id="solo" type="button">Jogar sozinho</button><button id="create">Criar sala</button></div>
-<label>Código da sala<input id="code" placeholder="Ex.: A1B2C3" maxlength="6"></label><button id="join" class="secondary">Entrar em sala</button>
-<p id="status" class="status">Jogue com três bots, crie uma sala ou entre com um código.</p></section>
-<section class="panel game" id="game" hidden>
-<div class="roomline"><strong><span id="room-prefix">Sala </span><span id="roomcode"></span></strong><span id="modeLabel"></span></div>
-<div class="players" id="players"></div><div class="score" id="score"></div>
-<div class="table"><p id="message">Esperando partida...</p><div id="played"></div></div>
-<p id="turn-status" class="status" aria-live="polite" hidden></p>
-<button id="start">Iniciar partida (4 jogadores)</button><div class="hand" id="hand"></div>
-<button id="leave" class="secondary">Sair da sala</button>
-</section><footer>MVP de demonstração • fichas virtuais • sem apostas em dinheiro real</footer>
-</main><script src="/socket.io/socket.io.js"></script><script src="app.js"></script></body></html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#151817">
+  <title>Rei do Truco Online</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">♛</span>
+        <div><strong>Rei do Truco</strong><span>CLUBE DE CARTAS</span></div>
+      </div>
+      <span class="free-badge">Jogo gratuito</span>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section id="lobby" aria-labelledby="lobby-title">
+      <div class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">♠ &nbsp; Lobby de truco</p>
+          <h1 id="lobby-title">Seu lugar é<br> <em>na mesa.</em></h1>
+          <p>Treine com os bots ou reúna sua dupla. Tem Truco Paulista e Mineiro na mesma casa.</p>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <span class="show-card show-card-back">♣</span>
+          <span class="show-card show-card-red"><small>7<br>♥</small>♥</span>
+          <span class="show-card show-card-front"><small>A<br>♠</small>♠</span>
+        </div>
+      </div>
+
+      <section class="lobby-options" aria-labelledby="options-title">
+        <div class="section-title">
+          <p class="eyebrow">Escolha sua partida</p>
+          <h2 id="options-title">Mesas de truco</h2>
+        </div>
+        <div class="settings">
+          <label for="name">Seu apelido<input id="name" maxlength="18" value="Jogador" autocomplete="nickname"></label>
+          <fieldset class="mode-select">
+            <legend>Modalidade</legend>
+            <div class="mode-options">
+              <label><input type="radio" name="mode" value="paulista" checked><span>Paulista</span></label>
+              <label><input type="radio" name="mode" value="mineiro"><span>Mineiro</span></label>
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="lobby-grid">
+          <article class="lobby-card solo-card">
+            <div class="lobby-card-meta"><span class="tile-icon" aria-hidden="true">♠</span><span class="tile-tag">3 bots</span></div>
+            <h3>Treino solo</h3>
+            <p>Sente à mesa e comece a jogar na hora.</p>
+            <button id="solo" type="button">Jogar sozinho</button>
+          </article>
+          <article class="lobby-card">
+            <div class="lobby-card-meta"><span class="tile-icon" aria-hidden="true">♣</span><span class="tile-tag">4 jogadores</span></div>
+            <h3>Crie uma mesa</h3>
+            <p>Abra uma sala privada e mande o código para seus amigos.</p>
+            <button id="create" type="button" class="secondary">Criar sala</button>
+          </article>
+          <article class="lobby-card">
+            <div class="lobby-card-meta"><span class="tile-icon" aria-hidden="true">♦</span><span class="tile-tag">Por convite</span></div>
+            <h3>Entre numa mesa</h3>
+            <form id="join-form" class="join-form">
+              <label for="code">Código da sala<input id="code" placeholder="Ex.: A1B2C3" maxlength="6" autocapitalize="characters" autocomplete="off" required></label>
+              <button type="submit" class="secondary">Entrar em sala</button>
+            </form>
+          </article>
+        </div>
+        <p id="status" class="status" role="status" hidden></p>
+      </section>
+    </section>
+
+    <section class="game" id="game" aria-labelledby="game-title" hidden>
+      <header class="game-header">
+        <div>
+          <p class="eyebrow" id="modeLabel"></p>
+          <h1 id="game-title"><span id="room-prefix">Sala </span><span id="roomcode"></span></h1>
+        </div>
+        <button id="leave" type="button" class="secondary">Sair da sala</button>
+      </header>
+
+      <div class="score" aria-label="Placar">
+        <div class="score-team"><span id="team-0">Dupla 1</span><strong id="points-0">0</strong></div>
+        <span id="round" class="round">Aguardando</span>
+        <div class="score-team"><strong id="points-1">0</strong><span id="team-1">Dupla 2</span></div>
+      </div>
+
+      <div class="arena">
+        <div class="table" aria-label="Mesa de jogo">
+          <span class="felt-mark" aria-hidden="true">♛</span>
+          <div id="played" class="played"></div>
+        </div>
+        <div id="players" class="players" aria-label="Jogadores"></div>
+      </div>
+
+      <div class="game-controls">
+        <p id="turn-status" class="turn-status" role="status" hidden></p>
+        <p id="message" class="game-message">Esperando partida...</p>
+        <p id="game-error" class="status" role="alert" hidden></p>
+        <button id="start" type="button">Iniciar partida (4 jogadores)</button>
+        <div class="hand" id="hand" aria-label="Suas cartas"></div>
+      </div>
+    </section>
+    <footer>Rei do Truco Online <span aria-hidden="true">•</span> Versão de demonstração</footer>
+  </main>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
