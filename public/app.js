@@ -1,6 +1,7 @@
 const socket = io();
 const $ = id => document.getElementById(id);
 const positions = ["bottom-right", "bottom-left", "top-left", "top-right"];
+const teamNames = ["Azul", "Vermelho"];
 const suits = {"♠": "espadas", "♥": "copas", "♣": "paus", "♦": "ouros"};
 let room = null;
 let tables = [];
@@ -162,6 +163,12 @@ $("start").onclick = () => {
 $("leave").onclick = () => {
   socket.emit("room:leave", () => resetRoom());
 };
+for (const [id, action] of [["run-hand", "run"], ["accept-truco", "accept"], ["ask-truco", "raise"]]) {
+  $(id).onclick = () => {
+    setStatus("");
+    socket.emit("game:hand-action", { action, offer: room.raise?.value ?? null }, handleResult);
+  };
+}
 
 socket.on("room:update", updatedRoom => {
   const entering = !room;
@@ -171,6 +178,7 @@ socket.on("room:update", updatedRoom => {
   if (receipt.open) receipt.close();
   const you = room.players.find(player => player.you);
   const current = room.players.find(player => player.seat === room.turn);
+  const actions = room.actions ?? {};
   $("lobby").hidden = true;
   $("game").hidden = false;
   if (entering) window.scrollTo(0, 0);
@@ -192,10 +200,15 @@ socket.on("room:update", updatedRoom => {
       : (you?.team === team ? "Sua dupla" : "Outra dupla");
     $("points-" + team).textContent = room.points[team];
   }
-  $("round").textContent = room.started ? `Vaza ${room.round}/3` : room.round > 3 ? "Fim da mão" : "Aguardando";
+  $("round").textContent = room.started ? `Vaza ${room.round}/3` : room.handOver ? "Fim da mão" : "Aguardando";
+  $("hand-value").textContent = room.handValue ?? (room.mode === "mineiro" ? 2 : 1);
   Array.from($("round-dots").children).forEach((dot, index) => {
-    dot.classList.toggle("done", index + 1 < room.round);
-    dot.classList.toggle("current", room.started && index + 1 === room.round);
+    const result = room.results?.[index];
+    const current = result === undefined && room.started && index + 1 === room.round;
+    const description = result === "tie" ? "Empate" : teamNames[result] ?? (current ? "Em jogo" : "Aguardando");
+    dot.dataset.result = result ?? "";
+    dot.classList.toggle("current", current);
+    dot.setAttribute("aria-label", `Vaza ${index + 1}: ${description}`);
   });
   $("message").textContent = room.message;
   $("played").replaceChildren(...room.table.map(({seat, card}) => {
@@ -205,16 +218,29 @@ socket.on("room:update", updatedRoom => {
     name.className = "played-name";
     const player = room.players.find(candidate => candidate.seat === seat);
     name.textContent = player?.you ? "Você" : player?.name || `Lugar ${seat + 1}`;
-    item.append(makeCard(card), name);
+    const face = makeCard(card);
+    if (room.highlightedSeats?.includes(seat)) {
+      const tied = room.results.at(-1) === "tie";
+      item.dataset.result = tied ? "tie" : seat % 2;
+      face.setAttribute("aria-label", face.getAttribute("aria-label") + (tied ? ", empatou" : ", venceu a vaza"));
+    }
+    item.append(face, name);
     return item;
   }));
 
   $("start").hidden = room.started;
   $("start").disabled = room.players.length !== room.size;
-  $("start").textContent = room.round > 3 ? "Jogar outra mão"
+  $("start").textContent = room.matchWinner != null ? "Jogar nova partida" : room.handOver ? "Jogar outra mão"
     : `Iniciar partida (${room.players.length}/${room.size} jogadores)`;
-  $("turn-status").hidden = !room.started || !current;
-  $("turn-status").textContent = current?.you ? "Sua vez de jogar" : current ? `Vez de ${current.name}` : "";
+  $("hand-actions").hidden = !room.started;
+  $("run-hand").disabled = !actions.run;
+  $("accept-truco").hidden = !actions.accept;
+  $("ask-truco").disabled = !actions.raiseTo;
+  const firstRaise = room.mode === "mineiro" ? 4 : 3;
+  $("ask-truco").textContent = actions.raiseTo && actions.raiseTo !== firstRaise ? `Pedir ${actions.raiseTo}` : "Truco!";
+  $("turn-status").hidden = !room.started || room.showingTrick || (!room.raise && !current);
+  $("turn-status").textContent = room.raise ? (actions.accept ? "Você pode aceitar, aumentar ou correr." : "Aguardando a resposta.")
+    : current?.you ? "Sua vez de jogar" : current ? `Vez de ${current.name}` : "";
   renderHand();
 });
 
@@ -244,9 +270,9 @@ function renderPlayers(you) {
     const player = room.players.find(candidate => candidate.seat === seat);
     const item = document.createElement("div");
     item.className = `player player-${position}`;
-    item.classList.toggle("active", room.started && room.turn === seat);
+    item.classList.toggle("active", room.started && !room.showingTrick && !room.raise && room.turn === seat);
     item.classList.toggle("empty", !player);
-    item.classList.toggle("own-seat", Boolean(player?.you));
+    if (player) item.dataset.team = player.team;
 
     const avatar = document.createElement("span");
     avatar.className = "avatar";
@@ -286,7 +312,7 @@ function makeCard(card, interactive = false) {
   element.setAttribute("aria-label", `${card.r} de ${suits[card.s]}`);
   if (interactive) {
     element.type = "button";
-    element.disabled = !room?.started || !room.players.some(player => player.you && player.seat === room.turn);
+    element.disabled = !room.actions?.play;
     element.onclick = () => {
       setStatus("");
       socket.emit("game:play", {cardId: card.id}, handleResult);

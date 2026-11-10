@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#090f27">
   <title>Rei do Truco Online</title>
-  <link rel="stylesheet" href="style.css?v=mesa-2">
+  <link rel="stylesheet" href="style.css?v=mesa-3">
 </head>
 <body>
   <header class="site-header">
@@ -107,8 +107,12 @@
       <div class="score" aria-label="Placar">
         <div class="score-section">
           <span class="score-label">Rodadas</span>
-          <div class="round-dots" id="round-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="round-dots" id="round-dots" role="group" aria-label="Resultados das vazas"><span role="img"></span><span role="img"></span><span role="img"></span></div>
           <span id="round" class="round">Aguardando</span>
+        </div>
+        <div class="score-section">
+          <span class="score-label">Tentos</span>
+          <strong id="hand-value" class="hand-value">1</strong>
         </div>
         <div class="score-section">
           <span class="score-label">Pontos</span>
@@ -142,8 +146,13 @@
 
       <div class="game-controls">
         <p id="turn-status" class="turn-status" role="status" hidden></p>
-        <p id="message" class="game-message">Esperando partida...</p>
+        <p id="message" class="game-message" role="status">Esperando partida...</p>
         <p id="game-error" class="status" role="alert" hidden></p>
+        <div class="hand-actions" id="hand-actions" hidden>
+          <button type="button" id="run-hand" class="secondary">Correr</button>
+          <button type="button" id="accept-truco" hidden>Aceitar</button>
+          <button type="button" id="ask-truco">Truco!</button>
+        </div>
         <button id="start" type="button">Iniciar partida (4 jogadores)</button>
       </div>
     </section>
@@ -170,6 +179,6 @@
   <button type="button" id="queue-join">Entrar na fila</button>
 </dialog>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=mesa-2"></script>
+  <script src="app.js?v=mesa-3"></script>
 </body>
 </html>
