@@ -29,16 +29,24 @@ function cardStrength(room, card) {
   return manilha >= 0 ? RANKS.length + manilha : VALUE[card.r];
 }
 function shuffled(a) { for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
-function roomView(room, socketId) {
-  return {code:room.code, mode:room.mode, solo:room.solo, players:room.players.map(p=>({name:p.name, seat:p.seat, team:p.seat%2, ready:!!p.ready, you:p.id===socketId})),
+function roomView(room) {
+  return {code:room.code, mode:room.mode, solo:room.solo,
+    players:room.players.map(player => ({ name: player.name, seat: player.seat, team: player.seat % 2,
+      ready: !!player.ready, cardCount: player.hand?.length ?? 0 })),
     size:room.size, match:room.match,
     vira:room.vira, manilhaRank:room.manilhaRank,
     started:room.started, round:room.round, points:room.points, turn:room.turn,
     table:room.table.map(t=>({seat:t.seat, card:t.card})), message:room.message};
 }
 function broadcast(room) {
+  const view = roomView(room);
   for (const player of room.players) {
-    if (!player.bot) io.to(player.id).emit("room:update", roomView(room, player.id));
+    if (player.bot) continue;
+    io.to(player.id).emit("room:update", {
+      ...view,
+      players: view.players.map(seat => ({ ...seat, you: seat.seat === player.seat })),
+      hand: player.hand ?? []
+    });
   }
 }
 function sendHand(player) {

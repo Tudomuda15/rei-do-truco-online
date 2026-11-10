@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#090f27">
   <title>Rei do Truco Online</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=mesa-2">
 </head>
 <body>
   <header class="site-header">
@@ -105,14 +105,22 @@
       </header>
 
       <div class="score" aria-label="Placar">
-        <div class="score-team"><span id="team-0">Dupla 1</span><strong id="points-0">0</strong></div>
-        <span id="round" class="round">Aguardando</span>
-        <div class="score-team"><strong id="points-1">0</strong><span id="team-1">Dupla 2</span></div>
+        <div class="score-section">
+          <span class="score-label">Rodadas</span>
+          <div class="round-dots" id="round-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+          <span id="round" class="round">Aguardando</span>
+        </div>
+        <div class="score-section">
+          <span class="score-label">Pontos</span>
+          <div class="score-points">
+            <div class="score-team"><strong id="points-0">0</strong><span id="team-0">Dupla 1</span></div>
+            <div class="score-team"><strong id="points-1">0</strong><span id="team-1">Dupla 2</span></div>
+          </div>
+        </div>
       </div>
 
       <div class="arena">
         <div class="table" aria-label="Mesa de jogo">
-          <span class="felt-mark" aria-hidden="true">♛</span>
           <div class="table-cards">
             <div class="table-stock">
               <div class="stock-item">
@@ -123,12 +131,13 @@
                 <span id="vira-card"></span>
                 <span>Vira</span>
               </div>
-              <span id="table-manilha" class="table-manilha" hidden></span>
             </div>
+            <span id="table-manilha" class="table-manilha" hidden></span>
             <div id="played" class="played"></div>
           </div>
         </div>
         <div id="players" class="players" aria-label="Jogadores"></div>
+        <div class="hand" id="hand" aria-label="Suas cartas"></div>
       </div>
 
       <div class="game-controls">
@@ -136,7 +145,6 @@
         <p id="message" class="game-message">Esperando partida...</p>
         <p id="game-error" class="status" role="alert" hidden></p>
         <button id="start" type="button">Iniciar partida (4 jogadores)</button>
-        <div class="hand" id="hand" aria-label="Suas cartas"></div>
       </div>
     </section>
     <footer>Rei do Truco Online <span aria-hidden="true">•</span> Versão de demonstração</footer>
@@ -162,6 +170,6 @@
   <button type="button" id="queue-join">Entrar na fila</button>
 </dialog>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=mesa-2"></script>
 </body>
 </html>

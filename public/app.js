@@ -1,9 +1,8 @@
 const socket = io();
 const $ = id => document.getElementById(id);
-const positions = ["bottom", "left", "top", "right"];
+const positions = ["bottom-right", "bottom-left", "top-left", "top-right"];
 const suits = {"♠": "espadas", "♥": "copas", "♣": "paus", "♦": "ouros"};
 let room = null;
-let hand = [];
 let tables = [];
 let counts = {};
 let selectedTable = null;
@@ -194,6 +193,10 @@ socket.on("room:update", updatedRoom => {
     $("points-" + team).textContent = room.points[team];
   }
   $("round").textContent = room.started ? `Vaza ${room.round}/3` : room.round > 3 ? "Fim da mão" : "Aguardando";
+  Array.from($("round-dots").children).forEach((dot, index) => {
+    dot.classList.toggle("done", index + 1 < room.round);
+    dot.classList.toggle("current", room.started && index + 1 === room.round);
+  });
   $("message").textContent = room.message;
   $("played").replaceChildren(...room.table.map(({seat, card}) => {
     const item = document.createElement("div");
@@ -215,14 +218,8 @@ socket.on("room:update", updatedRoom => {
   renderHand();
 });
 
-socket.on("game:hand", cards => {
-  hand = cards;
-  renderHand();
-});
-
 function resetRoom(message = "") {
   room = null;
-  hand = [];
   renderHand();
   $("game").hidden = true;
   $("lobby").hidden = false;
@@ -241,7 +238,7 @@ socket.on("disconnect", () => {
 });
 
 function renderPlayers(you) {
-  const layout = room.size === 2 ? ["bottom", "top"] : positions;
+  const layout = room.size === 2 ? ["bottom-right", "top-left"] : positions;
   $("players").replaceChildren(...layout.map((position, offset) => {
     const seat = ((you?.seat ?? 0) + offset) % room.size;
     const player = room.players.find(candidate => candidate.seat === seat);
@@ -249,6 +246,7 @@ function renderPlayers(you) {
     item.className = `player player-${position}`;
     item.classList.toggle("active", room.started && room.turn === seat);
     item.classList.toggle("empty", !player);
+    item.classList.toggle("own-seat", Boolean(player?.you));
 
     const avatar = document.createElement("span");
     avatar.className = "avatar";
@@ -262,6 +260,18 @@ function renderPlayers(you) {
     role.textContent = player?.you ? "Você" : !player ? "Aguardando" : offset === 2 ? "Sua dupla" : "Adversário";
     details.append(name, role);
     item.append(avatar, details);
+    if (player && !player.you && player.cardCount > 0) {
+      const backs = document.createElement("span");
+      backs.className = "player-cards";
+      backs.setAttribute("role", "img");
+      backs.setAttribute("aria-label", `${player.cardCount} ${player.cardCount === 1 ? "carta fechada" : "cartas fechadas"}`);
+      for (let index = 0; index < player.cardCount; index++) {
+        const back = document.createElement("span");
+        back.setAttribute("aria-hidden", "true");
+        backs.append(back);
+      }
+      item.append(backs);
+    }
     return item;
   }));
 }
@@ -288,6 +298,7 @@ function makeCard(card, interactive = false) {
 }
 
 function renderHand() {
+  const hand = room?.hand ?? [];
   $("hand").replaceChildren(...hand.map(card => makeCard(card, true)));
   $("hand").hidden = hand.length === 0;
 }
