@@ -4,6 +4,22 @@ const positions = ["bottom", "left", "top", "right"];
 const suits = {"♠": "espadas", "♥": "copas", "♣": "paus", "♦": "ouros"};
 let room = null;
 let hand = [];
+let tables = [];
+let counts = {};
+let selectedTable = null;
+let queuedTable = null;
+let pendingQueue = false;
+const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const wholeMoney = new Intl.NumberFormat("pt-BR", {
+  style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0
+});
+const variantName = { paulista: "Truco Paulista", mineiro: "Truco Mineiro" };
+const formatName = { solo: "Solo", arena: "Arena" };
+const matchups = { solo: "1 contra 1", arena: "2 contra 2" };
+const formatSelected = () => document.querySelector("input[name=format]:checked").value;
+const price = cents => money.format(cents / 100);
+const receipt = $("receipt");
+const queueIcon = '<svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="4" r="3"/><path d="M2 14v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1z"/></svg>';
 
 function setStatus(message) {
   const status = $(room ? "game-error" : "status");
@@ -28,6 +44,108 @@ function handleResult(result) {
   if (!result.ok) setStatus(result.error);
 }
 
+function renderTables() {
+  const format = formatSelected();
+  $("format-status").textContent = matchups[format] + " · Valores simulados";
+  for (const mode of Object.keys(variantName)) {
+    const buttons = tables.filter(table => table.format === format && table.mode === mode).map(table => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "tile";
+      button.dataset.tableId = table.id;
+      button.setAttribute("aria-haspopup", "dialog");
+      const amount = (table.entry % 100 === 0 ? wholeMoney : money).format(table.entry / 100);
+      button.innerHTML = '<strong>' + amount + '</strong><span class="queue-label">Fila</span>' +
+        '<span class="fee">Taxa ' + price(table.fee) + '</span><span class="queue">' +
+        queueIcon + '<span class="queue-count"></span></span>';
+      button.onclick = () => openReceipt(table);
+      return button;
+    });
+    $(mode + "-tables").replaceChildren(...buttons);
+  }
+  renderCounts();
+}
+
+function renderCounts() {
+  for (const button of document.querySelectorAll(".tile[data-table-id]")) {
+    button.querySelector(".queue-count").textContent = counts[button.dataset.tableId] || 0;
+  }
+  $("queue-status").hidden = !queuedTable;
+  $("queue-cancel").disabled = pendingQueue;
+  if (queuedTable) {
+    const { id, mode, format, entry, size } = queuedTable;
+    const joined = counts[id] || 1;
+    $("queue-message").textContent = `${variantName[mode]} · ${formatName[format]} · ${price(entry)} · ${joined}/${size} na fila`;
+  }
+}
+
+function openReceipt(table) {
+  selectedTable = table;
+  const { mode, format, entry, fee, size } = table;
+  const prize = entry * size;
+  $("receipt-title").textContent = variantName[mode] + " · " + formatName[format];
+  $("entry").textContent = price(entry);
+  $("fee").textContent = price(fee);
+  $("charge").textContent = price(entry + fee);
+  $("collected-label").textContent = "Total dos " + size + " jogadores";
+  $("collected").textContent = price(prize + fee * size);
+  $("fees").textContent = price(fee * size);
+  $("prize-label").textContent = size === 2 ? "Prêmio do vencedor" : "Prêmio da dupla";
+  $("prize").textContent = price(prize);
+  $("per-winner-row").hidden = size === 2;
+  $("per-winner").textContent = price(prize / 2);
+  $("queue-join").disabled = !socket.connected || pendingQueue;
+  $("queue-join").textContent = queuedTable && queuedTable.id !== table.id ? "Trocar de fila" : "Entrar na fila";
+  receipt.showModal();
+}
+
+$("queue-join").onclick = () => {
+  const table = selectedTable;
+  receipt.close();
+  if (!socket.connected || pendingQueue) return;
+  setStatus("");
+  pendingQueue = true;
+  $("queue-cancel").disabled = true;
+  socket.timeout(6000).emit("queue:join", { tableId: table.id, name: playerName() }, (error, result) => {
+    pendingQueue = false;
+    if (!error && result.ok && !room) queuedTable = table;
+    renderCounts();
+    if (error) return setStatus("A fila não respondeu. Tente de novo.");
+    if (!result.ok) return handleResult(result);
+    if (queuedTable) $("queue-status").scrollIntoView({ block: "nearest" });
+  });
+};
+$("queue-cancel").onclick = () => {
+  if (!socket.connected || pendingQueue) return;
+  pendingQueue = true;
+  renderCounts();
+  socket.timeout(6000).emit("queue:leave", error => {
+    pendingQueue = false;
+    if (!error) queuedTable = null;
+    renderCounts();
+    if (error) setStatus("Não foi possível sair da fila. Tente de novo.");
+  });
+};
+document.querySelector(".formats").addEventListener("change", renderTables);
+for (const toggle of document.querySelectorAll(".variant-toggle")) {
+  const list = $(toggle.getAttribute("aria-controls"));
+  toggle.onclick = () => {
+    const expanded = list.classList.toggle("is-expanded");
+    toggle.setAttribute("aria-pressed", String(expanded));
+    toggle.querySelector(".view-all").textContent = expanded ? "Ver em fileira" : "Ver todas";
+  };
+}
+socket.on("tables:catalog", payload => {
+  tables = payload.tables;
+  counts = payload.counts;
+  $("catalog-status").hidden = true;
+  renderTables();
+});
+socket.on("tables:counts", updated => {
+  counts = updated;
+  renderCounts();
+});
+
 $("solo").onclick = () => createRoom(true);
 $("create").onclick = () => createRoom(false);
 $("join-form").onsubmit = event => {
@@ -42,23 +160,31 @@ $("start").onclick = () => {
   setStatus("");
   socket.emit("game:start", handleResult);
 };
-$("leave").onclick = () => location.reload();
+$("leave").onclick = () => {
+  socket.emit("room:leave", () => resetRoom());
+};
 
 socket.on("room:update", updatedRoom => {
   const entering = !room;
   room = updatedRoom;
+  queuedTable = null;
+  renderCounts();
+  if (receipt.open) receipt.close();
   const you = room.players.find(player => player.you);
   const current = room.players.find(player => player.seat === room.turn);
   $("lobby").hidden = true;
   $("game").hidden = false;
   if (entering) window.scrollTo(0, 0);
-  $("roomcode").textContent = room.solo ? "Treino solo" : room.code;
-  $("room-prefix").hidden = room.solo;
-  $("modeLabel").textContent = room.mode === "paulista" ? "Truco Paulista" : "Truco Mineiro";
+  $("roomcode").textContent = room.match ? formatName[room.match.format] + " · " + price(room.match.entry)
+    : room.solo ? "Treino solo" : room.code;
+  $("room-prefix").hidden = room.solo || Boolean(room.match);
+  $("modeLabel").textContent = variantName[room.mode];
 
   renderPlayers(you);
   for (let team = 0; team < 2; team++) {
-    $("team-" + team).textContent = you?.team === team ? "Sua dupla" : "Outra dupla";
+    $("team-" + team).textContent = room.size === 2
+      ? (you?.team === team ? "Você" : "Adversário")
+      : (you?.team === team ? "Sua dupla" : "Outra dupla");
     $("points-" + team).textContent = room.points[team];
   }
   $("round").textContent = room.started ? `Vaza ${room.round}/3` : room.round > 3 ? "Fim da mão" : "Aguardando";
@@ -75,8 +201,9 @@ socket.on("room:update", updatedRoom => {
   }));
 
   $("start").hidden = room.started;
-  $("start").disabled = room.players.length !== 4;
-  $("start").textContent = room.solo ? "Jogar outra mão" : `Iniciar partida (${room.players.length}/4 jogadores)`;
+  $("start").disabled = room.players.length !== room.size;
+  $("start").textContent = room.round > 3 ? "Jogar outra mão"
+    : `Iniciar partida (${room.players.length}/${room.size} jogadores)`;
   $("turn-status").hidden = !room.started || !current;
   $("turn-status").textContent = current?.you ? "Sua vez de jogar" : current ? `Vez de ${current.name}` : "";
   renderHand();
@@ -87,19 +214,30 @@ socket.on("game:hand", cards => {
   renderHand();
 });
 
-socket.on("disconnect", () => {
-  if (!room) return;
+function resetRoom(message = "") {
   room = null;
   hand = [];
   renderHand();
   $("game").hidden = true;
   $("lobby").hidden = false;
-  setStatus("A conexão caiu. Assim que voltar, entre em uma mesa para jogar.");
+  setStatus(message);
+}
+socket.on("room:closed", resetRoom);
+socket.on("disconnect", () => {
+  pendingQueue = false;
+  queuedTable = null;
+  counts = {};
+  renderCounts();
+  $("queue-join").disabled = true;
+  $("catalog-status").textContent = "Reconectando às mesas…";
+  $("catalog-status").hidden = false;
+  if (room) resetRoom("A conexão caiu. Assim que voltar, entre em uma mesa para jogar.");
 });
 
 function renderPlayers(you) {
-  $("players").replaceChildren(...positions.map((position, offset) => {
-    const seat = ((you?.seat ?? 0) + offset) % 4;
+  const layout = room.size === 2 ? ["bottom", "top"] : positions;
+  $("players").replaceChildren(...layout.map((position, offset) => {
+    const seat = ((you?.seat ?? 0) + offset) % room.size;
     const player = room.players.find(candidate => candidate.seat === seat);
     const item = document.createElement("div");
     item.className = `player player-${position}`;

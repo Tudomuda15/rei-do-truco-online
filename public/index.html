@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#151817">
+  <meta name="theme-color" content="#090f27">
   <title>Rei do Truco Online</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -14,32 +14,55 @@
         <span class="brand-mark" aria-hidden="true">♛</span>
         <div><strong>Rei do Truco</strong><span>CLUBE DE CARTAS</span></div>
       </div>
-      <span class="free-badge">Jogo gratuito</span>
+      <span class="free-badge">Teste gratuito</span>
     </div>
   </header>
 
   <main class="shell">
     <section id="lobby" aria-labelledby="lobby-title">
-      <div class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">♠ &nbsp; Lobby de truco</p>
-          <h1 id="lobby-title">Seu lugar é<br> <em>na mesa.</em></h1>
-          <p>Treine com os bots ou reúna sua dupla. Tem Truco Paulista e Mineiro na mesma casa.</p>
-        </div>
-        <div class="hero-art" aria-hidden="true">
-          <span class="show-card show-card-back">♣</span>
-          <span class="show-card show-card-red"><small>7<br>♥</small>♥</span>
-          <span class="show-card show-card-front"><small>A<br>♠</small>♠</span>
+      <div class="lobby-head">
+        <h1 id="lobby-title">Jogue Agora</h1>
+        <fieldset class="formats" aria-label="Formato da partida">
+          <label class="choice">
+            <input type="radio" name="format" value="solo" aria-label="Solo, 1 contra 1" checked>
+            <span class="format-label">Solo</span>
+          </label>
+          <label class="choice">
+            <input type="radio" name="format" value="arena" aria-label="Arena, 2 contra 2">
+            <span class="format-label"><span class="bolt" aria-hidden="true">ϟ</span> Arena</span>
+          </label>
+        </fieldset>
+        <p class="status" id="format-status" aria-live="polite">1 contra 1 · Valores simulados</p>
+      </div>
+      <div class="lobby-tools">
+        <label for="name">Seu apelido<input id="name" maxlength="18" value="Jogador" autocomplete="nickname"></label>
+        <div class="queue-status" id="queue-status" hidden>
+          <p id="queue-message" role="status"></p>
+          <button id="queue-cancel" type="button" class="secondary">Sair da fila</button>
         </div>
       </div>
-
-      <section class="lobby-options" aria-labelledby="options-title">
-        <div class="section-title">
-          <p class="eyebrow">Escolha sua partida</p>
-          <h2 id="options-title">Mesas de truco</h2>
-        </div>
-        <div class="settings">
-          <label for="name">Seu apelido<input id="name" maxlength="18" value="Jogador" autocomplete="nickname"></label>
+      <p id="status" class="status" role="status" hidden></p>
+      <p id="catalog-status" class="status" role="status">Conectando às mesas…</p>
+      <section class="variant" aria-labelledby="paulista-title">
+        <h2 id="paulista-title">
+          <button class="variant-toggle" type="button" aria-controls="paulista-tables" aria-pressed="false" aria-label="Truco Paulista, ver todas as mesas em grade">
+            Truco Paulista <span class="suits" aria-hidden="true">♠ ♥</span>
+            <span class="view-all" aria-hidden="true">Ver todas</span>
+          </button>
+        </h2>
+        <div class="tiles" id="paulista-tables"></div>
+      </section>
+      <section class="variant" aria-labelledby="mineiro-title">
+        <h2 id="mineiro-title">
+          <button class="variant-toggle" type="button" aria-controls="mineiro-tables" aria-pressed="false" aria-label="Truco Mineiro, ver todas as mesas em grade">
+            Truco Mineiro <span class="suits" aria-hidden="true">♣ ♦</span>
+            <span class="view-all" aria-hidden="true">Ver todas</span>
+          </button>
+        </h2>
+        <div class="tiles" id="mineiro-tables"></div>
+      </section>
+      <details class="other-games">
+        <summary>Treino com bots e salas por convite</summary>
           <fieldset class="mode-select">
             <legend>Modalidade</legend>
             <div class="mode-options">
@@ -47,8 +70,6 @@
               <label><input type="radio" name="mode" value="mineiro"><span>Mineiro</span></label>
             </div>
           </fieldset>
-        </div>
-
         <div class="lobby-grid">
           <article class="lobby-card solo-card">
             <div class="lobby-card-meta"><span class="tile-icon" aria-hidden="true">♠</span><span class="tile-tag">3 bots</span></div>
@@ -71,8 +92,7 @@
             </form>
           </article>
         </div>
-        <p id="status" class="status" role="status" hidden></p>
-      </section>
+      </details>
     </section>
 
     <section class="game" id="game" aria-labelledby="game-title" hidden>
@@ -108,6 +128,26 @@
     </section>
     <footer>Rei do Truco Online <span aria-hidden="true">•</span> Versão de demonstração</footer>
   </main>
+<dialog class="receipt" id="receipt" aria-labelledby="receipt-title" aria-describedby="receipt-notice">
+  <form method="dialog">
+    <button class="close" type="submit" aria-label="Fechar resumo" autofocus>×</button>
+  </form>
+  <p class="eyebrow">Resumo da mesa</p>
+  <h2 id="receipt-title"></h2>
+  <dl>
+    <div class="row"><dt>Entrada por jogador</dt><dd id="entry"></dd></div>
+    <div class="row"><dt>Taxa por jogador</dt><dd id="fee"></dd></div>
+    <div class="row total"><dt>Total por jogador</dt><dd id="charge"></dd></div>
+    <div class="row"><dt id="collected-label"></dt><dd id="collected"></dd></div>
+    <div class="row"><dt>Total das taxas</dt><dd id="fees"></dd></div>
+  </dl>
+  <dl class="prize">
+    <div class="row"><dt id="prize-label"></dt><dd id="prize"></dd></div>
+    <div class="row" id="per-winner-row"><dt>Cada vencedor recebe</dt><dd id="per-winner"></dd></div>
+  </dl>
+  <p class="notice" id="receipt-notice">Partida gratuita. Os valores da mesa são simulados.</p>
+  <button type="button" id="queue-join">Entrar na fila</button>
+</dialog>
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
 </body>
