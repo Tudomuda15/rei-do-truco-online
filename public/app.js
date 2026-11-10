@@ -2,6 +2,7 @@ const socket = io();
 const $ = id => document.getElementById(id);
 const positions = ["bottom-right", "bottom-left", "top-left", "top-right"];
 const teamNames = ["Azul", "Vermelho"];
+const raiseLabels = { 3: "Truco!", 4: "Truco!", 6: "Seis!", 9: "Nove!", 12: "Doze!" };
 const suits = {"♠": "espadas", "♥": "copas", "♣": "paus", "♦": "ouros"};
 let room = null;
 let tables = [];
@@ -20,9 +21,98 @@ const formatSelected = () => document.querySelector("input[name=format]:checked"
 const price = cents => money.format(cents / 100);
 const receipt = $("receipt");
 const queueIcon = '<svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="4" r="3"/><path d="M2 14v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1z"/></svg>';
+const callKeys = ["truco", "seis", "nove", "doze", "correu"];
+const soundClips = new Map();
+let soundContext;
+let soundOn = true;
+let activeSound;
+let soundQueue = Promise.resolve();
+let soundVersion = 0;
+let noticeTimer;
+
+function unlockSound() {
+  if (!soundOn) return;
+  const AudioEngine = window.AudioContext || window.webkitAudioContext;
+  if (!AudioEngine) return;
+  if (!soundContext) {
+    soundContext = new AudioEngine();
+    for (const key of callKeys) {
+      const clip = fetch("sons/" + key + ".mp3")
+        .then(response => response.ok ? response.arrayBuffer() : null)
+        .then(bytes => bytes && soundContext.decodeAudioData(bytes))
+        .catch(() => null);
+      soundClips.set(key, clip);
+    }
+  }
+  if (soundContext.state !== "running") void soundContext.resume().catch(() => {});
+}
+
+function stopSounds() {
+  soundVersion++;
+  activeSound?.stop();
+}
+
+document.addEventListener("click", unlockSound, { capture: true });
+$("sound-toggle").onclick = () => {
+  soundOn = !soundOn;
+  $("sound-toggle").setAttribute("aria-pressed", String(soundOn));
+  $("sound-toggle").textContent = soundOn ? "Som ligado" : "Som desligado";
+  if (soundOn) unlockSound();
+  else stopSounds();
+};
+
+socket.on("game:call", ({ room: code, key }) => {
+  const clip = soundClips.get(key);
+  if (!soundOn || room?.code !== code || !clip) return;
+  const version = soundVersion;
+  soundQueue = soundQueue.then(async () => {
+    const buffer = await clip;
+    if (!buffer || version !== soundVersion || soundContext.state !== "running") return;
+    const source = soundContext.createBufferSource();
+    activeSound = source;
+    source.buffer = buffer;
+    source.connect(soundContext.destination);
+    await new Promise(resolve => {
+      source.onended = () => {
+        if (activeSound === source) activeSound = null;
+        source.disconnect();
+        resolve();
+      };
+      source.start();
+    });
+  }).catch(() => {});
+});
+
+for (const button of $("table-chat").querySelectorAll("[data-chat]")) {
+  button.onclick = () => {
+    const error = $("chat-error");
+    error.hidden = true;
+    const menu = button.closest("details");
+    const code = room?.code;
+    socket.emit("game:table-message", { kind: button.dataset.chat, id: button.dataset.item }, result => {
+      if (room?.code !== code) return;
+      if (result.ok) menu.open = false;
+      else {
+        error.textContent = result.error;
+        error.hidden = false;
+      }
+    });
+  };
+}
+
+socket.on("game:table-message", ({ room: code, kind, text, seat, name }) => {
+  if (!room || room.code !== code) return;
+  const notice = $("chat-notice");
+  const yours = room.players.some(player => player.you && player.seat === seat);
+  notice.dataset.kind = kind;
+  notice.textContent = (kind === "signal" ? "Só a dupla · " : "") + (yours ? "Você" : name) + " · " + text;
+  notice.hidden = false;
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => { notice.hidden = true; }, 4800);
+});
 
 function setStatus(message) {
-  const status = $(room ? "game-error" : "status");
+  const status = $(room ? (room.actions?.accept ? "raise-error" : "game-error") : "status");
   status.textContent = message;
   status.hidden = !message;
 }
@@ -163,11 +253,37 @@ $("start").onclick = () => {
 $("leave").onclick = () => {
   socket.emit("room:leave", () => resetRoom());
 };
-for (const [id, action] of [["run-hand", "run"], ["accept-truco", "accept"], ["ask-truco", "raise"]]) {
+for (const [id, action] of [["run-hand", "run"], ["refuse-truco", "run"], ["accept-truco", "accept"],
+  ["ask-truco", "raise"], ["counter-truco", "raise"]]) {
   $(id).onclick = () => {
+    if (!room) return;
     setStatus("");
     socket.emit("game:hand-action", { action, offer: room.raise?.value ?? null }, handleResult);
   };
+}
+
+function renderRaisePanel(actions) {
+  const panel = $("raise-panel");
+  const opening = panel.hidden;
+  panel.hidden = !actions.accept;
+  if (panel.hidden) return;
+
+  const { team, seat, value } = room.raise;
+  const caller = room.players.find(player => player.seat === seat);
+  $("raise-name").textContent = caller?.name ?? teamNames[team];
+  $("raise-name").dataset.team = team;
+  $("raise-call").textContent = raiseLabels[value];
+  $("raise-vira").hidden = !room.vira;
+  $("raise-vira").replaceChildren(...(room.vira ? [makeCard(room.vira)] : []));
+  $("raise-cards-label").textContent = room.table.length ? "Cartas na mesa" : "Nenhuma carta jogada nesta vaza";
+  $("raise-cards").hidden = room.table.length === 0;
+  $("raise-cards").replaceChildren(...room.table.map(({ card }) => makeCard(card)));
+  $("counter-truco").hidden = !actions.raiseTo;
+  $("counter-truco").textContent = raiseLabels[actions.raiseTo] ?? "";
+  if (opening) {
+    setStatus("");
+    panel.focus();
+  }
 }
 
 socket.on("room:update", updatedRoom => {
@@ -181,6 +297,9 @@ socket.on("room:update", updatedRoom => {
   const actions = room.actions ?? {};
   $("lobby").hidden = true;
   $("game").hidden = false;
+  $("table-chat").hidden = !room.chat?.table;
+  $("signal-menu").hidden = !room.chat?.signal;
+  $("message-menu").hidden = !room.chat?.table;
   if (entering) window.scrollTo(0, 0);
   $("roomcode").textContent = room.match ? formatName[room.match.format] + " · " + price(room.match.entry)
     : room.solo ? "Treino solo" : room.code;
@@ -211,6 +330,7 @@ socket.on("room:update", updatedRoom => {
     dot.setAttribute("aria-label", `Vaza ${index + 1}: ${description}`);
   });
   $("message").textContent = room.message;
+  $("played").hidden = Boolean(actions.accept);
   $("played").replaceChildren(...room.table.map(({seat, card}) => {
     const item = document.createElement("div");
     item.className = "played-card";
@@ -228,24 +348,30 @@ socket.on("room:update", updatedRoom => {
     return item;
   }));
 
-  $("start").hidden = room.started;
+  $("start").hidden = room.started || room.nextHand;
   $("start").disabled = room.players.length !== room.size;
   $("start").textContent = room.matchWinner != null ? "Jogar nova partida" : room.handOver ? "Jogar outra mão"
     : `Iniciar partida (${room.players.length}/${room.size} jogadores)`;
-  $("hand-actions").hidden = !room.started;
+  $("hand-actions").hidden = !room.started || Boolean(room.raise);
   $("run-hand").disabled = !actions.run;
-  $("accept-truco").hidden = !actions.accept;
   $("ask-truco").disabled = !actions.raiseTo;
-  const firstRaise = room.mode === "mineiro" ? 4 : 3;
-  $("ask-truco").textContent = actions.raiseTo && actions.raiseTo !== firstRaise ? `Pedir ${actions.raiseTo}` : "Truco!";
-  $("turn-status").hidden = !room.started || room.showingTrick || (!room.raise && !current);
-  $("turn-status").textContent = room.raise ? (actions.accept ? "Você pode aceitar, aumentar ou correr." : "Aguardando a resposta.")
+  $("ask-truco").textContent = raiseLabels[actions.raiseTo] ?? "Truco!";
+  $("turn-status").hidden = !room.started || room.showingTrick || actions.accept || (!room.raise && !current);
+  $("turn-status").textContent = room.raise ? "Aguardando a resposta."
     : current?.you ? "Sua vez de jogar" : current ? `Vez de ${current.name}` : "";
   renderHand();
+  renderRaisePanel(actions);
 });
 
 function resetRoom(message = "") {
   room = null;
+  stopSounds();
+  clearTimeout(noticeTimer);
+  $("chat-notice").hidden = true;
+  $("chat-error").hidden = true;
+  $("signal-menu").open = false;
+  $("message-menu").open = false;
+  $("raise-panel").hidden = true;
   renderHand();
   $("game").hidden = true;
   $("lobby").hidden = false;
@@ -311,6 +437,10 @@ function makeCard(card, interactive = false) {
   element.lastChild.textContent = card.s;
   element.setAttribute("aria-label", `${card.r} de ${suits[card.s]}`);
   if (interactive) {
+    if (card.manilha) {
+      element.classList.add("manilha");
+      element.setAttribute("aria-label", element.getAttribute("aria-label") + ", manilha");
+    }
     element.type = "button";
     element.disabled = !room.actions?.play;
     element.onclick = () => {

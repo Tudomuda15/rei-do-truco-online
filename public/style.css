@@ -41,6 +41,8 @@ button:focus-visible, input:focus-visible, .mode-options input:focus-visible + s
 
 .topbar, .shell { width: min(1560px, calc(100% - 48px)); margin-inline: auto; }
 .topbar { display: flex; min-height: 68px; justify-content: space-between; align-items: center; gap: 12px; }
+.topbar-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 9px; padding-block: 4px; }
+#sound-toggle { min-height: 34px; padding: 4px 9px; font-size: .73rem; white-space: nowrap; }
 .brand { display: flex; align-items: center; gap: 11px; }
 .brand-mark {
   display: grid;
@@ -279,15 +281,61 @@ footer span { margin-inline: 4px; color: var(--gold); }
 .game-controls > button { margin-top: 3px; }
 .hand-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   gap: 6px;
   width: min(100%, 660px);
   margin-top: 10px;
 }
+.table-chat {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  width: min(100%, 660px);
+  margin: 13px auto 0;
+}
+.table-chat details { border: 1px solid #52658f; border-radius: 9px; background: #182749; }
+.table-chat details[open] { grid-column: 1 / -1; }
+.table-chat summary { padding: 9px 11px; color: var(--ink); font-size: .85rem; font-weight: 700; cursor: pointer; }
+.chat-options { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 8px 8px; }
+.chat-options button { min-height: 39px; padding: 5px 9px; border-color: #5a709f; background: #26375f; color: var(--ink); font-size: .78rem; }
+.table-chat .status, .chat-notice { grid-column: 1 / -1; margin: 0; overflow-wrap: anywhere; }
+.chat-notice { padding: 7px 10px; border: 1px solid #637aad; border-radius: 8px; background: #202f56; font-size: .82rem; }
+.chat-notice[data-kind="signal"] { border-color: #dfc184; background: #3e3431; color: #ffe8b3; }
 #run-hand { grid-column: 1; justify-self: start; }
-#accept-truco { grid-column: 2; justify-self: center; }
-#ask-truco { grid-column: 3; justify-self: end; }
+#ask-truco { grid-column: 2; justify-self: end; }
+
+.raise-panel {
+  position: absolute;
+  z-index: 2;
+  inset: calc(50% - 13px) auto auto 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 9px;
+  width: min(calc(100% - 26px), 510px);
+  padding: clamp(12px, 2.6vw, 26px);
+  border: 1px solid #667aaf;
+  border-block-start: 4px solid #819ae0;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #172347, #243760);
+  color: var(--ink);
+  box-shadow: 0 15px 34px #03091996;
+  text-align: center;
+}
+.raise-panel:focus-visible { outline: 2px solid var(--gold-light); outline-offset: 3px; }
+.raise-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.raise-header h2 { margin: 0; font-size: clamp(1rem, 2.4vw, 1.28rem); overflow-wrap: anywhere; }
+#raise-name[data-team="0"] { color: #82c7ff; }
+#raise-name[data-team="1"] { color: #ff9ab3; }
+.raise-stock .card, .raise-cards .card { width: clamp(32px, 6vw, 49px); }
+.raise-label { color: #d4dffb; font-size: .83rem; }
+.raise-cards { display: flex; justify-content: center; gap: 7px; }
+.raise-buttons { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+.raise-buttons button { padding-inline: 5px; border-color: transparent; color: #142141; }
+#refuse-truco { background: #ffb0c4; }
+#accept-truco { background: #b0edc6; }
+#counter-truco { background: #f1f2ff; }
+.raise-panel .status { margin: 0; font-size: .8rem; }
 
 .played, .hand { display: flex; justify-content: center; align-items: flex-start; gap: 6px; }
 .played { position: absolute; top: calc(50% + 61px); inset-inline: 0; padding: 0 3px; }
@@ -323,6 +371,11 @@ footer span { margin-inline: 4px; color: var(--gold); }
 .card-suit { font-size: clamp(1.25rem, 4.9vw, 2.5rem); line-height: 1; }
 .hand .card { width: clamp(39px, 12vw, 67px); flex-shrink: 0; }
 .hand .card:disabled { opacity: .74; }
+.hand .card.manilha {
+  border-color: #ffda75;
+  box-shadow: 0 0 0 1px #ffda75, 0 0 14px #ffdc6d9c, 0 4px 9px #0007;
+}
+.hand .card.manilha:disabled { opacity: .9; }
 .hand .card:not(:disabled):hover { transform: translateY(-4px); }
 
 @media (max-width: 680px) {

@@ -19,9 +19,20 @@ const SUITS = ["♦","♠","♥","♣"];
 const RANKS = ["4","5","6","7","Q","J","K","A","2","3"];
 const VALUE = Object.fromEntries(RANKS.map((r,i)=>[r,i]));
 const MINEIRO_MANILHAS = ["7♦", "A♠", "7♥", "4♣"];
-const HAND_VALUES = { paulista: [1, 3, 6, 9, 12], mineiro: [2, 4, 6, 10, 12] };
+const HAND_VALUES = { paulista: [1, 3, 6, 9, 12], mineiro: [2, 4, 6, 9, 12] };
+const CALLS = { 3: "truco", 4: "truco", 6: "seis", 9: "nove", 12: "doze" };
+const SIGNALS = new Map([
+  ["gato", "Gato"], ["copas", "Copas"], ["espada", "Espada"], ["mole", "Mole"],
+  ["um", "Um"], ["dois", "Dois"], ["tres", "Três"]
+]);
+const TABLE_MESSAGES = new Map([
+  ["boa-noite", "Boa noite!"], ["salve", "Salve!"], ["boa-partida", "Boa partida!"], ["valeu", "Valeu!"],
+  ["vai-levar-seis", "Se pedir truco, vai levar seis!"], ["patos", "Dois patos!"],
+  ["cagoes", "São dois cagões!"], ["marrecos", "São dois marrecos!"]
+]);
 const TEAM_NAMES = ["Azul", "Vermelho"];
-const TRICK_REVEAL_MS = 2000;
+const TRICK_REVEAL_MS = 1000;
+const NEXT_HAND_MS = 900;
 function deck() {
   return SUITS.flatMap(s => RANKS.map(r => ({ r, s, id: r + s })));
 }
@@ -40,8 +51,13 @@ function roomView(room) {
     vira:room.vira, manilhaRank:room.manilhaRank,
     started:room.started, round:room.round, points:room.points, turn:room.turn,
     results:room.results, showingTrick: Boolean(room.revealTimer), highlightedSeats:room.highlightedSeats,
-    handValue:room.handValue, handOver:room.handOver, matchWinner:room.matchWinner, raise:room.raise,
+    handValue:room.handValue, handOver:room.handOver, nextHand: Boolean(room.nextHandTimer),
+    matchWinner:room.matchWinner, raise:room.raise,
     table:room.table.map(t=>({seat:t.seat, card:t.card})), message:room.message};
+}
+function partnerFor(room, player) {
+  if (room.solo || room.size !== 4) return null;
+  return room.players.find(other => other.seat === (player.seat + 2) % room.size);
 }
 function broadcast(room) {
   const view = roomView(room);
@@ -50,8 +66,9 @@ function broadcast(room) {
     io.to(player.id).emit("room:update", {
       ...view,
       players: view.players.map(seat => ({ ...seat, you: seat.seat === player.seat })),
-      hand: player.hand ?? [],
-      actions: handActions(room, player)
+      hand: (player.hand ?? []).map(card => ({ ...card, manilha: cardStrength(room, card) >= RANKS.length })),
+      actions: handActions(room, player),
+      chat: { table: !room.solo && room.players.length > 1, signal: Boolean(partnerFor(room, player)) }
     });
   }
 }
@@ -112,9 +129,9 @@ function leave(socket) {
     clearGameTimers(room);
     rooms.delete(room.code);
   } else {
-    if (room.started) {
+    if (room.started || room.nextHandTimer) {
       clearGameTimers(room);
-      Object.assign(room, { started: false, round: 1, table: [], results: [], highlightedSeats: [],
+      Object.assign(room, { started: false, handOver: false, round: 1, table: [], results: [], highlightedSeats: [],
         vira: null, manilhaRank: null, raise: null, message: "Um jogador saiu. Aguardando outro para continuar." });
       room.players.forEach(player => { player.hand = []; sendHand(player); });
     }
@@ -125,8 +142,10 @@ function leave(socket) {
 function clearGameTimers(room) {
   clearTimeout(room.botTimer);
   clearTimeout(room.revealTimer);
+  clearTimeout(room.nextHandTimer);
   room.botTimer = undefined;
   room.revealTimer = undefined;
+  room.nextHandTimer = undefined;
 }
 
 function startGame(room) {
@@ -197,7 +216,13 @@ function finishHand(room, team, reason) {
     room.points[team] = Math.min(12, room.points[team] + room.handValue);
     if (room.points[team] === 12) room.matchWinner = team;
   }
-  const ending = room.matchWinner === null ? "" : ` ${TEAM_NAMES[room.matchWinner]} venceu a partida!`;
+  if (room.matchWinner === null) {
+    room.nextHandTimer = setTimeout(() => {
+      room.nextHandTimer = undefined;
+      startGame(room);
+    }, NEXT_HAND_MS);
+  }
+  const ending = room.matchWinner === null ? " A próxima mão vai começar." : ` ${TEAM_NAMES[room.matchWinner]} venceu a partida!`;
   room.message = reason + ending;
   broadcast(room);
 }
@@ -330,7 +355,7 @@ io.on("connection", socket=>{
   socket.on("game:start", cb=>{
     const room=getRoom(socket); if(!room) return cb({ok:false,error:"Entre em uma sala primeiro."});
     if(room.players.length!==room.size) return cb({ok:false,error:`São necessários ${room.size} jogadores.`});
-    if(room.started) return cb({ok:true});
+    if(room.started || room.nextHandTimer) return cb({ok:true});
     startGame(room);cb({ok:true});
   });
   socket.on("game:play", (request, cb)=>{
@@ -352,17 +377,43 @@ io.on("connection", socket=>{
     const action = request?.action;
     if (action === "raise" && actions.raiseTo) {
       if (room.raise) room.handValue = room.raise.value;
-      room.raise = { team, value: actions.raiseTo };
-      room.message = `${TEAM_NAMES[team]} pediu ${actions.raiseTo} tentos.`;
+      room.raise = { team, value: actions.raiseTo, seat: player.seat };
+      room.message = `${player.name} pediu ${actions.raiseTo} tentos.`;
       broadcast(room);
+      const call = CALLS[actions.raiseTo];
+      if (call) io.to(room.code).emit("game:call", { room: room.code, key: call });
       scheduleBotTurn(room);
     } else if (action === "accept" && actions.accept) {
       acceptRaise(room);
     } else if (action === "run" && actions.run) {
       finishHand(room, 1 - team, `${TEAM_NAMES[team]} correu. ${TEAM_NAMES[1 - team]} venceu a mão.`);
+      io.to(room.code).emit("game:call", { room: room.code, key: "correu" });
     } else {
       return cb({ ok: false, error: "Esta opção não está disponível agora." });
     }
+    cb({ ok: true });
+  });
+  socket.on("game:table-message", (request, cb) => {
+    if (typeof cb !== "function") return;
+    const room = getRoom(socket);
+    const player = room?.players.find(candidate => candidate.id === socket.id);
+    if (!player || room.solo) return cb({ ok: false, error: "Entre numa mesa com outros jogadores." });
+
+    const signal = request?.kind === "signal";
+    const catalog = signal ? SIGNALS : request?.kind === "table" ? TABLE_MESSAGES : null;
+    const message = catalog?.get(request?.id);
+    if (!message) return cb({ ok: false, error: "Escolha uma mensagem do menu." });
+    const partner = signal ? partnerFor(room, player) : null;
+    if (signal ? !partner : room.players.length < 2) {
+      return cb({ ok: false, error: signal ? "Aguarde seu parceiro na mesa." : "Aguarde outro jogador na mesa." });
+    }
+    const now = Date.now();
+    if (now - (socket.data.lastTableMessageAt ?? 0) < 800) {
+      return cb({ ok: false, error: "Espere um instante para enviar outra mensagem." });
+    }
+    socket.data.lastTableMessageAt = now;
+    const audience = signal ? io.to(socket.id).to(partner.id) : io.to(room.code);
+    audience.emit("game:table-message", { room: room.code, kind: request.kind, text: message, seat: player.seat, name: player.name });
     cb({ ok: true });
   });
   socket.on("disconnect",()=>{

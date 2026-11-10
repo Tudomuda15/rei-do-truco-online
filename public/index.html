@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#090f27">
   <title>Rei do Truco Online</title>
-  <link rel="stylesheet" href="style.css?v=mesa-3">
+  <link rel="stylesheet" href="style.css?v=mesa-5">
 </head>
 <body>
   <header class="site-header">
@@ -14,7 +14,10 @@
         <span class="brand-mark" aria-hidden="true">♛</span>
         <div><strong>Rei do Truco</strong><span>CLUBE DE CARTAS</span></div>
       </div>
-      <span class="free-badge">Teste gratuito</span>
+      <div class="topbar-actions">
+        <button class="secondary" id="sound-toggle" type="button" aria-label="Som das jogadas" aria-pressed="true">Som ligado</button>
+        <span class="free-badge">Teste gratuito</span>
+      </div>
     </div>
   </header>
 
@@ -142,6 +145,23 @@
         </div>
         <div id="players" class="players" aria-label="Jogadores"></div>
         <div class="hand" id="hand" aria-label="Suas cartas"></div>
+        <section class="raise-panel" id="raise-panel" aria-labelledby="raise-title" tabindex="-1" hidden>
+          <div class="raise-header">
+            <h2 id="raise-title"><span id="raise-name"></span> pediu <span id="raise-call"></span></h2>
+            <div class="table-stock raise-stock">
+              <span id="raise-vira"></span>
+              <span class="card deck-back" aria-label="Baralho" role="img">♛</span>
+            </div>
+          </div>
+          <p class="raise-label" id="raise-cards-label">Cartas na mesa</p>
+          <div class="raise-cards" id="raise-cards" aria-labelledby="raise-cards-label"></div>
+          <p class="status" id="raise-error" role="alert" hidden></p>
+          <div class="raise-buttons">
+            <button type="button" id="refuse-truco">Correr</button>
+            <button type="button" id="accept-truco">Aceitar</button>
+            <button type="button" id="counter-truco" hidden>Seis!</button>
+          </div>
+        </section>
       </div>
 
       <div class="game-controls">
@@ -150,10 +170,38 @@
         <p id="game-error" class="status" role="alert" hidden></p>
         <div class="hand-actions" id="hand-actions" hidden>
           <button type="button" id="run-hand" class="secondary">Correr</button>
-          <button type="button" id="accept-truco" hidden>Aceitar</button>
           <button type="button" id="ask-truco">Truco!</button>
         </div>
         <button id="start" type="button">Iniciar partida (4 jogadores)</button>
+      </div>
+      <div class="table-chat" id="table-chat" aria-label="Comunicação da mesa" hidden>
+        <p class="chat-notice" id="chat-notice" role="status" hidden></p>
+        <p class="status" id="chat-error" role="alert" hidden></p>
+        <details id="signal-menu" hidden>
+          <summary>Sinais da dupla</summary>
+          <div class="chat-options" aria-label="Sinais privados">
+            <button type="button" data-chat="signal" data-item="gato">Gato</button>
+            <button type="button" data-chat="signal" data-item="copas">Copas</button>
+            <button type="button" data-chat="signal" data-item="espada">Espada</button>
+            <button type="button" data-chat="signal" data-item="mole">Mole</button>
+            <button type="button" data-chat="signal" data-item="um">Um</button>
+            <button type="button" data-chat="signal" data-item="dois">Dois</button>
+            <button type="button" data-chat="signal" data-item="tres">Três</button>
+          </div>
+        </details>
+        <details id="message-menu" hidden>
+          <summary>Mensagens</summary>
+          <div class="chat-options" aria-label="Mensagens para a mesa">
+            <button type="button" data-chat="table" data-item="boa-noite">Boa noite!</button>
+            <button type="button" data-chat="table" data-item="salve">Salve!</button>
+            <button type="button" data-chat="table" data-item="boa-partida">Boa partida!</button>
+            <button type="button" data-chat="table" data-item="valeu">Valeu!</button>
+            <button type="button" data-chat="table" data-item="vai-levar-seis">Se pedir truco, vai levar seis!</button>
+            <button type="button" data-chat="table" data-item="patos">Dois patos!</button>
+            <button type="button" data-chat="table" data-item="cagoes">São dois cagões!</button>
+            <button type="button" data-chat="table" data-item="marrecos">São dois marrecos!</button>
+          </div>
+        </details>
       </div>
     </section>
     <footer>Rei do Truco Online <span aria-hidden="true">•</span> Versão de demonstração</footer>
@@ -179,6 +227,6 @@
   <button type="button" id="queue-join">Entrar na fila</button>
 </dialog>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=mesa-3"></script>
+  <script src="app.js?v=mesa-7"></script>
 </body>
 </html>
